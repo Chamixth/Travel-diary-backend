@@ -14,7 +14,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func TripImageUploadHandler(cfg config.Config, db *mongo.Database, analysis *service.ImageAnalysisQueue) fiber.Handler {
+// TripImagePresignHandler hands back one presigned S3 PUT URL per requested
+// file. No file bytes touch this backend — the browser uploads directly to
+// S3 with the returned URL and confirms completion via TripImageCompleteHandler.
+func TripImagePresignHandler(cfg config.Config, db *mongo.Database, analysis *service.ImageAnalysisQueue) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		svc, err := newTripImageService(cfg, db, analysis)
 		if err != nil {
@@ -25,23 +28,51 @@ func TripImageUploadHandler(cfg config.Config, db *mongo.Database, analysis *ser
 		if !ok {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthorized"})
 		}
-		tripID := c.Params("id")
 
-		form, err := c.MultipartForm()
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "multipart form required"})
-		}
-		files := form.File["images"]
-		if len(files) == 0 {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "no images provided"})
+		var req dto.PresignImagesRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
 		}
 
-		resp, err := svc.UploadMany(c.Context(), userID, tripID, files)
+		resp, err := svc.PresignUploads(c.Context(), userID, c.Params("id"), req.Files)
 		if err != nil {
+			if err == fiber.ErrNotFound {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "trip not found"})
+			}
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
 		}
+		return c.JSON(resp)
+	}
+}
 
-		return c.Status(fiber.StatusCreated).JSON(dto.TripImageUploadResponse{Uploaded: resp})
+// TripImageCompleteHandler is called once the browser has PUT each file
+// straight to S3 using the URLs from TripImagePresignHandler. It verifies
+// every object against S3 directly, records it, and queues analysis.
+func TripImageCompleteHandler(cfg config.Config, db *mongo.Database, analysis *service.ImageAnalysisQueue) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		svc, err := newTripImageService(cfg, db, analysis)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+
+		userID, ok := middleware.Auth0UserID(c)
+		if !ok {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "unauthorized"})
+		}
+
+		var req dto.CompleteImagesRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+		}
+
+		resp, err := svc.CompleteUploads(c.Context(), userID, c.Params("id"), req.Images)
+		if err != nil {
+			if err == fiber.ErrNotFound {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "trip not found"})
+			}
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.Status(fiber.StatusCreated).JSON(resp)
 	}
 }
 

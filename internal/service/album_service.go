@@ -62,11 +62,10 @@ func (s *AlbumService) Generate(ctx context.Context, userID, tripID string) (mod
 	plan, planErr := ai.GenerateSmartAlbumPlan(ctx, s.config.OpenAIKey, s.config.OpenAIModelImage, trip.Title, trip.Destination, trip.CinematicMood, trip.Intention, trip.Departure, trip.Return, planningImages)
 	if planErr == nil {
 		if validationErr := validateAlbumPlan(plan, images); validationErr != nil {
-			log.Printf("smart_album_validation_failed trip_id=%s error=%v; retrying", tripID, validationErr)
-			plan, planErr = ai.GenerateSmartAlbumPlan(ctx, s.config.OpenAIKey, s.config.OpenAIModelImage, trip.Title, trip.Destination, trip.CinematicMood, trip.Intention, trip.Departure, trip.Return, planningImages)
-			if planErr == nil {
-				planErr = validateAlbumPlan(plan, images)
-			}
+			// Do not make a second long AI request here. The fallback below is
+			// deterministic and keeps album generation within the API timeout.
+			log.Printf("smart_album_validation_failed trip_id=%s error=%v; using fallback", tripID, validationErr)
+			planErr = validationErr
 		}
 	}
 	if planErr != nil {

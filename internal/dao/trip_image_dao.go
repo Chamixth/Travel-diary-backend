@@ -23,6 +23,12 @@ func (d TripImageDAO) FindByID(ctx context.Context, userID, imageID string) (mod
 	return image, nil
 }
 
+func (d TripImageDAO) SetThumbnail(ctx context.Context, imageID, thumbnailS3Key string) error {
+	_, err := d.col.UpdateOne(ctx, bson.M{"_id": imageID},
+		bson.M{"$set": bson.M{"thumbnailS3Key": thumbnailS3Key, "updatedAt": time.Now().UTC()}})
+	return err
+}
+
 func (d TripImageDAO) SetAnalysisState(ctx context.Context, imageID, status, analysisError string, analyzedAt *time.Time) error {
 	update := bson.M{"analysisStatus": status, "analysisError": analysisError, "updatedAt": time.Now().UTC()}
 	if analyzedAt != nil {

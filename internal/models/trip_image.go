@@ -15,6 +15,7 @@ type TripImage struct {
 	EXIF            *ImageEXIF `bson:"exif,omitempty" json:"exif,omitempty"`
 	S3Key           string     `bson:"s3Key" json:"s3Key"`
 	S3URL           string     `bson:"s3Url" json:"s3Url"`
+	ThumbnailS3Key  string     `bson:"thumbnailS3Key,omitempty" json:"thumbnailS3Key,omitempty"`
 	AnalysisStatus  string     `bson:"analysisStatus" json:"analysisStatus"`
 	AnalysisError   string     `bson:"analysisError,omitempty" json:"analysisError,omitempty"`
 	AnalyzedAt      *time.Time `bson:"analyzedAt,omitempty" json:"analyzedAt,omitempty"`

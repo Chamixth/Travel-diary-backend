@@ -37,7 +37,11 @@ func New(cfg config.Config) (*fiber.App, error) {
 	if err := dao.NewPricingDAO(db).SeedDefaults(context.Background(), service.DefaultPricingPlans()); err != nil {
 		return nil, fmt.Errorf("seed pricing plans: %w", err)
 	}
-	analysisQueue := service.NewImageAnalysisQueue(cfg, db)
+	s3Client, err := integrations.NewS3Client(context.Background(), cfg.AWSRegion, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.AWSBucket)
+	if err != nil {
+		return nil, fmt.Errorf("create s3 client: %w", err)
+	}
+	analysisQueue := service.NewImageAnalysisQueue(cfg, db, s3Client)
 
 	corsCfg := fibercors.Config{
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",

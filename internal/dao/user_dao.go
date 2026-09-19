@@ -20,9 +20,18 @@ type UserDAO struct {
 
 func NewUserDAO(db *mongo.Database) UserDAO {
 	col := db.Collection("users")
-	_, _ = col.Indexes().CreateMany(context.Background(), []mongo.IndexModel{
-		{Keys: bson.D{{Key: "username", Value: 1}}, Options: options.Index().SetUnique(true)},
-		{Keys: bson.D{{Key: "email", Value: 1}}, Options: options.Index().SetUnique(true)},
+	ctx := context.Background()
+	_, _ = col.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "username", Value: 1}}, Options: options.Index().SetUnique(true),
+	})
+	// Auth0 access tokens may not contain an email claim. A sparse index allows
+	// multiple users without an email while preserving uniqueness when present.
+	_, _ = col.Indexes().DropOne(ctx, "email_1")
+	_, _ = col.UpdateMany(ctx, bson.M{"email": ""}, bson.M{"$unset": bson.M{"email": ""}})
+	_, _ = col.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "email", Value: 1}}, Options: options.Index().SetUnique(true).SetSparse(true),
+	})
+	_, _ = col.Indexes().CreateMany(ctx, []mongo.IndexModel{
 		{Keys: bson.D{{Key: "googleId", Value: 1}}, Options: options.Index().SetUnique(true).SetSparse(true)},
 		{Keys: bson.D{{Key: "auth0Id", Value: 1}}, Options: options.Index().SetUnique(true).SetSparse(true)},
 	})
@@ -99,16 +108,19 @@ func (d UserDAO) UpsertAuth0User(ctx context.Context, u models.User) (models.Use
 	u.UpdatedAt = now
 
 	filter := bson.M{"auth0Id": u.Auth0ID}
+	set := bson.M{
+		"username":     u.Username,
+		"auth0Id":      u.Auth0ID,
+		"authProvider": u.AuthProvider,
+		"name":         u.Name,
+		"pictureUrl":   u.PictureURL,
+		"updatedAt":    now,
+	}
+	if u.Email != "" {
+		set["email"] = u.Email
+	}
 	update := bson.M{
-		"$set": bson.M{
-			"username":     u.Username,
-			"email":        u.Email,
-			"auth0Id":      u.Auth0ID,
-			"authProvider": u.AuthProvider,
-			"name":         u.Name,
-			"pictureUrl":   u.PictureURL,
-			"updatedAt":    now,
-		},
+		"$set": set,
 		"$setOnInsert": bson.M{
 			"_id":           u.ID,
 			"createdAt":     now,

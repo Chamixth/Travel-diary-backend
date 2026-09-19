@@ -47,7 +47,7 @@ func Auth0(cfg config.Config, db *mongo.Database) fiber.Handler {
 
 		_, claims, err := integrations.ParseAuth0Token(c.Context(), jwksURL, cfg.Auth0Issuer, cfg.Auth0Audience, raw)
 		if err != nil {
-			log.Printf("auth0: token validation failed for %s %s: %v", c.Method(), c.Path(), err)
+			log.Printf("auth0: token validation failed for %s %s: %v (expected issuer=%q audience=%q)", c.Method(), c.Path(), err, cfg.Auth0Issuer, cfg.Auth0Audience)
 			return fiber.ErrUnauthorized
 		}
 
