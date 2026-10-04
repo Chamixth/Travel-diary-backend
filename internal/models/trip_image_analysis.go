@@ -21,6 +21,7 @@ type TripImageAnalysis struct {
 	Quality         QualityAnalysis     `bson:"quality" json:"quality"`
 	Composition     CompositionAnalysis `bson:"composition" json:"composition"`
 	LocationGuess   LocationGuess       `bson:"locationGuess" json:"locationGuess"`
+	Memory          MemoryAnalysis      `bson:"memory" json:"memory"`
 	Model           string              `bson:"model" json:"-"`
 	AnalysisVersion int                 `bson:"analysisVersion" json:"analysisVersion"`
 	PromptVersion   string              `bson:"promptVersion" json:"-"`

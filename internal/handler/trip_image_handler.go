@@ -135,5 +135,5 @@ func newTripImageService(cfg config.Config, db *mongo.Database, analysis *servic
 	if err != nil {
 		return nil, err
 	}
-	return service.NewTripImageService(dao.NewTripDAO(db), dao.NewTripImageDAO(db), dao.NewTripImageAnalysisDAO(db), s3Client, analysis), nil
+	return service.NewTripImageService(dao.NewTripDAO(db), dao.NewTripImageDAO(db), dao.NewTripImageAnalysisDAO(db), dao.NewMediaAssetDAO(db), dao.NewUploadReservationDAO(db), s3Client, analysis), nil
 }

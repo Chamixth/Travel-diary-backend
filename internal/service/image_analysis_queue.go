@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 	"travel-diary-backend/internal/ai"
+	"travel-diary-backend/internal/ai/prompts"
 	"travel-diary-backend/internal/config"
 	"travel-diary-backend/internal/dao"
 	"travel-diary-backend/internal/integrations"
@@ -79,7 +80,7 @@ func (q *ImageAnalysisQueue) worker() {
 		result.UserID = job.userID
 		result.Model = q.model
 		result.AnalysisVersion = CurrentAnalysisVersion
-		result.PromptVersion = "v1"
+		result.PromptVersion = prompts.MemoryAnalystV1.Version
 		if err := q.analyses.Upsert(ctx, result); err != nil {
 			_ = q.images.SetAnalysisState(ctx, job.imageID, "FAILED", "could not save image analysis: "+err.Error(), nil)
 			log.Printf("image_analysis_save_failed image_id=%s duration_ms=%d error=%v", job.imageID, time.Since(started).Milliseconds(), err)

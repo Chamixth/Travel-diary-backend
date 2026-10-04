@@ -2,6 +2,7 @@ package router
 
 import (
 	"travel-diary-backend/internal/config"
+	"travel-diary-backend/internal/generation"
 	"travel-diary-backend/internal/handler"
 	"travel-diary-backend/internal/middleware"
 	"travel-diary-backend/internal/service"
@@ -10,7 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func Register(app *fiber.App, cfg config.Config, db *mongo.Database, analysis *service.ImageAnalysisQueue) {
+func Register(app *fiber.App, cfg config.Config, db *mongo.Database, analysis *service.ImageAnalysisQueue, generationQueue *generation.Queue) {
 	api := app.Group("/api")
 
 	v1 := api.Group("/v1")
@@ -40,8 +41,15 @@ func Register(app *fiber.App, cfg config.Config, db *mongo.Database, analysis *s
 	trips.Get("/:id/images", handler.TripImageListHandler(cfg, db, analysis))
 	trips.Get("/:id/images/:imageId/analysis", handler.TripImageAnalysisHandler(db))
 	trips.Post("/:id/images/retry-analysis", handler.TripImageRetryAnalysisHandler(cfg, db, analysis))
+	trips.Post("/:id/media/backfill", handler.TripMediaBackfillHandler(cfg, db))
 	trips.Delete("/:id/images/:imageId", handler.TripImageDeleteHandler(cfg, db, analysis))
 	trips.Get("/:id/analysis-status", handler.TripAnalysisStatusHandler(db))
 	trips.Post("/:id/album/generate", handler.GenerateAlbumHandler(cfg, db))
 	trips.Get("/:id/album", handler.AlbumGetHandler(cfg, db))
+	trips.Get("/:id/experience", handler.ExperienceGetHandler(db))
+	trips.Get("/:id/experience/versions", handler.ExperienceVersionsListHandler(db))
+	trips.Put("/:id/experience/versions/:version/activate", handler.ExperienceVersionActivateHandler(db))
+	jobs := generationQueue.Service(db)
+	trips.Post("/:id/generation-jobs", handler.GenerationJobStartHandler(jobs))
+	trips.Get("/:id/generation-jobs/:jobId", handler.GenerationJobGetHandler(jobs))
 }

@@ -29,11 +29,13 @@ import (
 )
 
 type TripImageService struct {
-	trips    dao.TripDAO
-	images   dao.TripImageDAO
-	analyses dao.TripImageAnalysisDAO
-	s3       *integrations.S3Client
-	analysis *ImageAnalysisQueue
+	trips        dao.TripDAO
+	images       dao.TripImageDAO
+	analyses     dao.TripImageAnalysisDAO
+	mediaAssets  dao.MediaAssetDAO
+	reservations dao.UploadReservationDAO
+	s3           *integrations.S3Client
+	analysis     *ImageAnalysisQueue
 
 	// De-dupes the fire-and-forget thumbnail backfill (see toTripImageResponse)
 	// so an old image without a thumbnail doesn't get one background job
@@ -49,9 +51,9 @@ type TripImageService struct {
 	thumbnailSem chan struct{}
 }
 
-func NewTripImageService(trips dao.TripDAO, images dao.TripImageDAO, analyses dao.TripImageAnalysisDAO, s3 *integrations.S3Client, analysis *ImageAnalysisQueue) *TripImageService {
+func NewTripImageService(trips dao.TripDAO, images dao.TripImageDAO, analyses dao.TripImageAnalysisDAO, mediaAssets dao.MediaAssetDAO, reservations dao.UploadReservationDAO, s3 *integrations.S3Client, analysis *ImageAnalysisQueue) *TripImageService {
 	return &TripImageService{
-		trips: trips, images: images, analyses: analyses, s3: s3, analysis: analysis,
+		trips: trips, images: images, analyses: analyses, mediaAssets: mediaAssets, reservations: reservations, s3: s3, analysis: analysis,
 		thumbnailSem: make(chan struct{}, 2),
 	}
 }
@@ -109,8 +111,18 @@ func (s *TripImageService) PresignUploads(ctx context.Context, userID, tripID st
 		}
 
 		key := fmt.Sprintf("trips/%s/%s%s", tripID, uuid.NewString(), filepath.Ext(f.FileName))
+		reservation := models.UploadReservation{
+			ID: uuid.NewString(), UserID: userID, TripID: tripID, ClientID: f.ClientID,
+			S3Key: key, FileName: f.FileName, ExpectedContentType: f.ContentType,
+			Status: models.UploadReservationPending, ExpiresAt: time.Now().UTC().Add(presignExpiry),
+			CreatedAt: time.Now().UTC(),
+		}
+		if err := s.reservations.Create(ctx, reservation); err != nil {
+			return dto.PresignImagesResponse{}, err
+		}
 		url, err := s.s3.PresignPutObject(ctx, key, f.ContentType, presignExpiry)
 		if err != nil {
+			_ = s.reservations.Delete(ctx, reservation.ID)
 			return dto.PresignImagesResponse{}, err
 		}
 		resp.Uploads = append(resp.Uploads, dto.PresignedImageUpload{
@@ -156,6 +168,19 @@ func (s *TripImageService) CompleteUploads(ctx context.Context, userID, tripID s
 }
 
 func (s *TripImageService) completeOne(ctx context.Context, userID, tripID string, item dto.CompleteImageUpload) (dto.TripImageResponse, error) {
+	claimToken := uuid.NewString()
+	reservation, err := s.reservations.Claim(ctx, userID, tripID, item.S3Key, claimToken, 2*time.Minute)
+	if err != nil {
+		return dto.TripImageResponse{}, fmt.Errorf("upload key is invalid, expired, or already completed")
+	}
+	claimed := true
+	defer func() {
+		if claimed {
+			_ = s.reservations.Release(context.Background(), reservation.ID, claimToken)
+		}
+	}()
+	item.FileName = reservation.FileName
+
 	size, contentType, err := s.s3.HeadObject(ctx, item.S3Key)
 	if err != nil {
 		return dto.TripImageResponse{}, fmt.Errorf("upload did not complete")
@@ -169,10 +194,20 @@ func (s *TripImageService) completeOne(ctx context.Context, userID, tripID strin
 	}
 	if !acceptedImageTypes[contentType] {
 		_ = s.s3.DeleteObject(ctx, item.S3Key)
+		_ = s.reservations.Complete(ctx, reservation.ID, claimToken)
+		claimed = false
 		return dto.TripImageResponse{}, fmt.Errorf("unsupported image type (use JPEG, PNG, GIF, or HEIC)")
+	}
+	if contentType != reservation.ExpectedContentType {
+		_ = s.s3.DeleteObject(ctx, item.S3Key)
+		_ = s.reservations.Complete(ctx, reservation.ID, claimToken)
+		claimed = false
+		return dto.TripImageResponse{}, fmt.Errorf("uploaded file type does not match the reserved type")
 	}
 	if size <= 0 || size > maxImageBytes {
 		_ = s.s3.DeleteObject(ctx, item.S3Key)
+		_ = s.reservations.Complete(ctx, reservation.ID, claimToken)
+		claimed = false
 		return dto.TripImageResponse{}, fmt.Errorf("file is larger than 15 MB")
 	}
 
@@ -245,6 +280,38 @@ func (s *TripImageService) completeOne(ctx context.Context, userID, tripID strin
 	if err != nil {
 		return dto.TripImageResponse{}, err
 	}
+	// Rich media metadata lives beside the legacy image record. Extraction is
+	// supplemental: a valid upload remains usable even if a codec or metadata
+	// parser cannot describe every property.
+	if fullData, metadataErr := s.s3.GetObject(ctx, item.S3Key); metadataErr == nil {
+		if asset, buildErr := BuildMediaAssetMetadata(fullData, record.ID, tripID, userID, item.S3Key, contentType, cfg.Width, cfg.Height); buildErr == nil {
+			_ = s.mediaAssets.Upsert(ctx, asset)
+		} else {
+			_ = s.mediaAssets.Upsert(ctx, models.MediaAsset{
+				ID: record.ID, ImageID: record.ID, TripID: tripID, UserID: userID,
+				Kind: "photo", ContentType: contentType, OriginalS3Key: item.S3Key,
+				Width: cfg.Width, Height: cfg.Height, DisplayWidth: cfg.Width, DisplayHeight: cfg.Height,
+				Orientation: displayOrientation(cfg.Width, cfg.Height), MetadataVersion: models.MediaMetadataVersion,
+				MetadataStatus: "partial", MetadataError: buildErr.Error(),
+				Derivatives: []models.MediaDerivative{{Kind: "original", S3Key: item.S3Key, ContentType: contentType, Width: cfg.Width, Height: cfg.Height}},
+			})
+		}
+	} else {
+		_ = s.mediaAssets.Upsert(ctx, models.MediaAsset{
+			ID: record.ID, ImageID: record.ID, TripID: tripID, UserID: userID,
+			Kind: "photo", ContentType: contentType, OriginalS3Key: item.S3Key,
+			Width: cfg.Width, Height: cfg.Height, DisplayWidth: cfg.Width, DisplayHeight: cfg.Height,
+			Orientation: displayOrientation(cfg.Width, cfg.Height), MetadataVersion: models.MediaMetadataVersion,
+			MetadataStatus: "pending", MetadataError: metadataErr.Error(),
+			Derivatives: []models.MediaDerivative{{Kind: "original", S3Key: item.S3Key, ContentType: contentType, Width: cfg.Width, Height: cfg.Height}},
+		})
+	}
+	if err := s.reservations.Complete(ctx, reservation.ID, claimToken); err != nil {
+		_ = s.images.DeleteByID(context.Background(), userID, tripID, record.ID)
+		_ = s.mediaAssets.DeleteByImageID(context.Background(), userID, record.ID)
+		return dto.TripImageResponse{}, fmt.Errorf("could not finalize upload reservation")
+	}
+	claimed = false
 	// Generate the thumbnail in the background rather than blocking this
 	// response on it: CompleteUploads processes a whole batch sequentially in
 	// one request, and a synchronous download-resize-upload per file here
@@ -252,7 +319,10 @@ func (s *TripImageService) completeOne(ctx context.Context, userID, tripID strin
 	s.backfillThumbnail(record.ID, item.S3Key)
 	if s.analysis != nil {
 		if err := s.analysis.Enqueue(ctx, record); err != nil {
-			return dto.TripImageResponse{}, err
+			record.AnalysisStatus = "FAILED"
+			record.AnalysisError = "could not queue image analysis: " + err.Error()
+			_ = s.images.SetAnalysisState(context.Background(), record.ID, "FAILED", record.AnalysisError, nil)
+			return s.toTripImageResponse(ctx, record), nil
 		}
 		record.AnalysisStatus = "QUEUED"
 	}
@@ -309,8 +379,16 @@ func (s *TripImageService) DeleteByTripID(ctx context.Context, userID, tripID st
 		if err := s.s3.DeleteObject(ctx, image.S3Key); err != nil {
 			return err
 		}
+		if image.ThumbnailS3Key != "" {
+			if err := s.s3.DeleteObject(ctx, image.ThumbnailS3Key); err != nil {
+				return err
+			}
+		}
 	}
 	if err := s.analyses.DeleteByTripID(ctx, userID, tripID); err != nil {
+		return err
+	}
+	if err := s.mediaAssets.DeleteByTripID(ctx, userID, tripID); err != nil {
 		return err
 	}
 	return s.images.DeleteByTripID(ctx, userID, tripID)
@@ -327,7 +405,15 @@ func (s *TripImageService) Delete(ctx context.Context, userID, tripID, imageID s
 	if err := s.s3.DeleteObject(ctx, image.S3Key); err != nil {
 		return err
 	}
+	if image.ThumbnailS3Key != "" {
+		if err := s.s3.DeleteObject(ctx, image.ThumbnailS3Key); err != nil {
+			return err
+		}
+	}
 	if err := s.analyses.DeleteByImageID(ctx, userID, imageID); err != nil {
+		return err
+	}
+	if err := s.mediaAssets.DeleteByImageID(ctx, userID, imageID); err != nil {
 		return err
 	}
 	return s.images.DeleteByID(ctx, userID, tripID, imageID)
@@ -437,8 +523,12 @@ func (s *TripImageService) backfillThumbnail(imageID, s3Key string) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		if thumbKey, err := s.createThumbnail(ctx, s3Key); err == nil {
+		if thumbKey, width, height, err := s.createThumbnail(ctx, s3Key); err == nil {
 			_ = s.images.SetThumbnail(ctx, imageID, thumbKey)
+			_ = s.mediaAssets.AddDerivative(ctx, imageID, models.MediaDerivative{
+				Kind: "thumbnail", S3Key: thumbKey, ContentType: "image/jpeg",
+				Width: width, Height: height,
+			})
 		}
 	}()
 }
@@ -447,20 +537,24 @@ func (s *TripImageService) backfillThumbnail(imageID, s3Key string) {
 // to thumbnailMaxDimension on its long edge, and stores the result under a
 // sibling "thumbs/" key — so the gallery can load a file sized in KB instead
 // of an original photo that can run into the megabytes.
-func (s *TripImageService) createThumbnail(ctx context.Context, s3Key string) (string, error) {
+func (s *TripImageService) createThumbnail(ctx context.Context, s3Key string) (string, int, int, error) {
 	original, err := s.s3.GetObject(ctx, s3Key)
 	if err != nil {
-		return "", err
+		return "", 0, 0, err
 	}
 	thumb, err := generateThumbnailJPEG(original)
 	if err != nil {
-		return "", err
+		return "", 0, 0, err
 	}
 	thumbKey := thumbnailKeyFor(s3Key)
 	if err := s.s3.PutObject(ctx, thumbKey, "image/jpeg", thumb); err != nil {
-		return "", err
+		return "", 0, 0, err
 	}
-	return thumbKey, nil
+	config, _, err := image.DecodeConfig(bytes.NewReader(thumb))
+	if err != nil {
+		return thumbKey, 0, 0, nil
+	}
+	return thumbKey, config.Width, config.Height, nil
 }
 
 // thumbnailKeyFor derives "trips/<id>/thumbs/<name>.jpg" from

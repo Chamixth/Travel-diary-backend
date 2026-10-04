@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://voyaloom.app/contracts/experience-spec-v1.schema.json",
+  "title": "VoyaLoom ExperienceSpec v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatorVersion",
+    "id",
+    "dna",
+    "scenes",
+    "transitions",
+    "globalEffects",
+    "typography",
+    "navigation",
+    "responsiveRules"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "generatorVersion": { "$ref": "#/$defs/nonEmptyString" },
+    "id": { "$ref": "#/$defs/nonEmptyString" },
+    "dna": { "$ref": "#/$defs/experienceDNA" },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/scene" }
+    },
+    "transitions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/transition" }
+    },
+    "globalEffects": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/effect" }
+    },
+    "typography": { "$ref": "#/$defs/typography" },
+    "navigation": { "$ref": "#/$defs/navigation" },
+    "responsiveRules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/responsiveRule" }
+    }
+  },
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "stringArray": { "type": "array", "items": { "type": "string" } },
+    "experienceDNA": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "creativeThesis",
+        "interactionMetaphor",
+        "emotionalArc",
+        "visualLanguage",
+        "motionLanguage",
+        "navigationConcept",
+        "signatureMoment",
+        "constraints"
+      ],
+      "properties": {
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "subtitle": { "type": "string" },
+        "creativeThesis": { "$ref": "#/$defs/nonEmptyString" },
+        "interactionMetaphor": { "$ref": "#/$defs/nonEmptyString" },
+        "emotionalArc": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["opening", "development", "climax", "ending"],
+          "properties": {
+            "opening": { "type": "string" },
+            "development": { "type": "string" },
+            "climax": { "type": "string" },
+            "ending": { "type": "string" }
+          }
+        },
+        "visualLanguage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "personality",
+            "atmosphere",
+            "paletteStrategy",
+            "typographyStrategy",
+            "imageTreatment"
+          ],
+          "properties": {
+            "personality": { "$ref": "#/$defs/stringArray" },
+            "atmosphere": { "$ref": "#/$defs/stringArray" },
+            "paletteStrategy": { "type": "string" },
+            "textureStrategy": { "type": "string" },
+            "typographyStrategy": { "type": "string" },
+            "imageTreatment": { "type": "string" }
+          }
+        },
+        "motionLanguage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["personality", "intensity", "pacing", "physics", "scrollBehavior"],
+          "properties": {
+            "personality": { "type": "string" },
+            "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+            "pacing": { "type": "string" },
+            "physics": { "type": "string" },
+            "scrollBehavior": { "type": "string" }
+          }
+        },
+        "navigationConcept": { "type": "string" },
+        "signatureMoment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["concept", "assetIds", "memoryTest"],
+          "properties": {
+            "concept": { "$ref": "#/$defs/nonEmptyString" },
+            "sceneId": { "type": "string" },
+            "assetIds": { "$ref": "#/$defs/stringArray" },
+            "memoryTest": { "$ref": "#/$defs/nonEmptyString" }
+          }
+        },
+        "constraints": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["avoid", "accessibilityNotes", "performanceNotes"],
+          "properties": {
+            "avoid": { "$ref": "#/$defs/stringArray" },
+            "accessibilityNotes": { "$ref": "#/$defs/stringArray" },
+            "performanceNotes": { "$ref": "#/$defs/stringArray" }
+          }
+        }
+      }
+    },
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "fallback"],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "version": { "$ref": "#/$defs/nonEmptyString" },
+        "params": { "type": "object" },
+        "fallback": { "type": "string" }
+      }
+    },
+    "assetPlacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assetId", "role", "alt", "focalX", "focalY"],
+      "properties": {
+        "assetId": { "$ref": "#/$defs/nonEmptyString" },
+        "role": { "$ref": "#/$defs/nonEmptyString" },
+        "alt": { "$ref": "#/$defs/nonEmptyString" },
+        "focalX": { "type": "number", "minimum": 0, "maximum": 1 },
+        "focalY": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "scene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "chapterId",
+        "layout",
+        "motion",
+        "assets",
+        "content",
+        "effects",
+        "loadPriority",
+        "fallback"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "chapterId": { "$ref": "#/$defs/nonEmptyString" },
+        "layout": { "$ref": "#/$defs/nonEmptyString" },
+        "motion": { "$ref": "#/$defs/nonEmptyString" },
+        "assets": { "type": "array", "items": { "$ref": "#/$defs/assetPlacement" } },
+        "content": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "eyebrow": { "type": "string" },
+            "title": { "type": "string" },
+            "body": { "type": "string" },
+            "caption": { "type": "string" }
+          }
+        },
+        "effects": { "type": "array", "items": { "$ref": "#/$defs/effect" } },
+        "loadPriority": { "enum": ["eager", "nearby", "lazy"] },
+        "fallback": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["layout", "motion"],
+          "properties": {
+            "layout": { "$ref": "#/$defs/nonEmptyString" },
+            "motion": { "$ref": "#/$defs/nonEmptyString" }
+          }
+        }
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fromSceneId", "toSceneId", "type", "durationMs"],
+      "properties": {
+        "fromSceneId": { "$ref": "#/$defs/nonEmptyString" },
+        "toSceneId": { "$ref": "#/$defs/nonEmptyString" },
+        "type": { "$ref": "#/$defs/nonEmptyString" },
+        "durationMs": { "type": "integer", "minimum": 0, "maximum": 10000 }
+      }
+    },
+    "typography": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["personality", "displayScale", "bodyMeasure"],
+      "properties": {
+        "personality": { "$ref": "#/$defs/nonEmptyString" },
+        "displayScale": { "$ref": "#/$defs/nonEmptyString" },
+        "bodyMeasure": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "navigation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "showProgress", "keyboard", "label"],
+      "properties": {
+        "type": { "$ref": "#/$defs/nonEmptyString" },
+        "showProgress": { "type": "boolean" },
+        "keyboard": { "type": "boolean" },
+        "label": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "responsiveRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "breakpoint", "layout", "motion", "effectTier"],
+      "properties": {
+        "target": { "$ref": "#/$defs/nonEmptyString" },
+        "breakpoint": { "enum": ["mobile", "tablet", "desktop"] },
+        "layout": { "$ref": "#/$defs/nonEmptyString" },
+        "motion": { "$ref": "#/$defs/nonEmptyString" },
+        "effectTier": { "enum": ["A", "B", "C"] }
+      }
+    }
+  }
+}

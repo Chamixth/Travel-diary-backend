@@ -1,0 +1,94 @@
+{
+  "title": "VoyaLoom CreativeDirection v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generatorVersion", "selectedConceptId", "selectionRationale", "dna"],
+  "properties": {
+    "schemaVersion": { "type": "string", "enum": ["1.0"] },
+    "generatorVersion": { "type": "string", "enum": ["creative-director-v1"] },
+    "selectedConceptId": { "$ref": "#/$defs/text" },
+    "selectionRationale": { "$ref": "#/$defs/text" },
+    "dna": { "$ref": "#/$defs/dna" }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1 },
+    "textArray": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/text" } },
+    "dna": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title", "subtitle", "creativeThesis", "interactionMetaphor", "emotionalArc",
+        "visualLanguage", "motionLanguage", "navigationConcept", "signatureMoment", "constraints"
+      ],
+      "properties": {
+        "title": { "$ref": "#/$defs/text" },
+        "subtitle": { "type": "string" },
+        "creativeThesis": { "$ref": "#/$defs/text" },
+        "interactionMetaphor": { "$ref": "#/$defs/text" },
+        "emotionalArc": { "$ref": "#/$defs/emotionalArc" },
+        "visualLanguage": { "$ref": "#/$defs/visualLanguage" },
+        "motionLanguage": { "$ref": "#/$defs/motionLanguage" },
+        "navigationConcept": { "$ref": "#/$defs/text" },
+        "signatureMoment": { "$ref": "#/$defs/signatureMoment" },
+        "constraints": { "$ref": "#/$defs/constraints" }
+      }
+    },
+    "emotionalArc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["opening", "development", "climax", "ending"],
+      "properties": {
+        "opening": { "$ref": "#/$defs/text" },
+        "development": { "$ref": "#/$defs/text" },
+        "climax": { "$ref": "#/$defs/text" },
+        "ending": { "$ref": "#/$defs/text" }
+      }
+    },
+    "visualLanguage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["personality", "atmosphere", "paletteStrategy", "textureStrategy", "typographyStrategy", "imageTreatment"],
+      "properties": {
+        "personality": { "$ref": "#/$defs/textArray" },
+        "atmosphere": { "$ref": "#/$defs/textArray" },
+        "paletteStrategy": { "$ref": "#/$defs/text" },
+        "textureStrategy": { "type": "string" },
+        "typographyStrategy": { "$ref": "#/$defs/text" },
+        "imageTreatment": { "$ref": "#/$defs/text" }
+      }
+    },
+    "motionLanguage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["personality", "intensity", "pacing", "physics", "scrollBehavior"],
+      "properties": {
+        "personality": { "$ref": "#/$defs/text" },
+        "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "pacing": { "$ref": "#/$defs/text" },
+        "physics": { "$ref": "#/$defs/text" },
+        "scrollBehavior": { "$ref": "#/$defs/text" }
+      }
+    },
+    "signatureMoment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["concept", "sceneId", "assetIds", "memoryTest"],
+      "properties": {
+        "concept": { "$ref": "#/$defs/text" },
+        "sceneId": { "type": "string", "enum": [""] },
+        "assetIds": { "$ref": "#/$defs/textArray" },
+        "memoryTest": { "$ref": "#/$defs/text" }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["avoid", "accessibilityNotes", "performanceNotes"],
+      "properties": {
+        "avoid": { "$ref": "#/$defs/textArray" },
+        "accessibilityNotes": { "$ref": "#/$defs/textArray" },
+        "performanceNotes": { "$ref": "#/$defs/textArray" }
+      }
+    }
+  }
+}

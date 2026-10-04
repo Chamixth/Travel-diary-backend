@@ -1,0 +1,89 @@
+{
+  "title": "VoyaLoom StorySpec v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatorVersion",
+    "titleCandidates",
+    "summary",
+    "emotionalArc",
+    "chapters",
+    "heroAssetId",
+    "climaxAssetId",
+    "endingAssetIds",
+    "motifs",
+    "recurringElements",
+    "omittedAssetIds"
+  ],
+  "properties": {
+    "schemaVersion": { "type": "string", "enum": ["1.0"] },
+    "generatorVersion": { "type": "string", "enum": ["story-director-v1"] },
+    "titleCandidates": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/nonEmptyString" }
+    },
+    "summary": { "$ref": "#/$defs/nonEmptyString" },
+    "emotionalArc": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/emotionBeat" }
+    },
+    "chapters": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/chapter" }
+    },
+    "heroAssetId": { "type": "string" },
+    "climaxAssetId": { "type": "string" },
+    "endingAssetIds": { "$ref": "#/$defs/stringArray" },
+    "motifs": { "$ref": "#/$defs/stringArray" },
+    "recurringElements": { "$ref": "#/$defs/stringArray" },
+    "omittedAssetIds": { "$ref": "#/$defs/stringArray" }
+  },
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "stringArray": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "emotionBeat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["order", "name", "description", "intensity", "momentIds"],
+      "properties": {
+        "order": { "type": "integer", "minimum": 1 },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "description": { "$ref": "#/$defs/nonEmptyString" },
+        "intensity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "momentIds": { "$ref": "#/$defs/stringArray" }
+      }
+    },
+    "chapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "order",
+        "title",
+        "narrativeRole",
+        "pacing",
+        "momentIds",
+        "featuredAssets",
+        "supportingAssets"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/nonEmptyString" },
+        "order": { "type": "integer", "minimum": 1 },
+        "title": { "$ref": "#/$defs/nonEmptyString" },
+        "narrativeRole": { "$ref": "#/$defs/nonEmptyString" },
+        "pacing": { "$ref": "#/$defs/nonEmptyString" },
+        "momentIds": { "$ref": "#/$defs/stringArray" },
+        "featuredAssets": { "$ref": "#/$defs/stringArray" },
+        "supportingAssets": { "$ref": "#/$defs/stringArray" }
+      }
+    }
+  }
+}

@@ -11,58 +11,66 @@ import (
 )
 
 type Config struct {
-	AppName               string
-	Environment           string
-	Port                  string
-	DatabaseURL           string
-	MongoDatabase         string
-	AWSRegion             string
-	AWSAccessKeyID        string
-	AWSSecretAccessKey    string
-	AWSBucket             string
-	JWTSecret             string
-	Auth0Domain           string
-	Auth0Audience         string
-	Auth0Issuer           string
-	Auth0JWKSURL          string
-	CORSAllowedOrigins    string
-	GoogleClientID        string
-	GoogleClientSecret    string
-	GoogleAuthStateSecret string
-	GoogleRedirectURL     string
-	FrontendRedirectURL   string
-	OpenAIKey             string
-	OpenAIModelImage      string
-	ImageAnalysisWorkers  int
+	AppName                 string
+	Environment             string
+	Port                    string
+	DatabaseURL             string
+	MongoDatabase           string
+	AWSRegion               string
+	AWSAccessKeyID          string
+	AWSSecretAccessKey      string
+	AWSBucket               string
+	JWTSecret               string
+	Auth0Domain             string
+	Auth0Audience           string
+	Auth0Issuer             string
+	Auth0JWKSURL            string
+	CORSAllowedOrigins      string
+	GoogleClientID          string
+	GoogleClientSecret      string
+	GoogleAuthStateSecret   string
+	GoogleRedirectURL       string
+	FrontendRedirectURL     string
+	OpenAIKey               string
+	OpenAIModelImage        string
+	OpenAIModelCreative     string
+	CreativePipelineEnabled bool
+	ImageAnalysisWorkers    int
+	GenerationWorkers       int
+	GenerationMaxAttempts   int
 }
 
 func Load() Config {
 	loadDotEnv(".env")
 
 	return Config{
-		AppName:               getEnv("APP_NAME", "travel-diary-backend"),
-		Environment:           getEnv("APP_ENV", "development"),
-		Port:                  getEnv("PORT", "8001"),
-		DatabaseURL:           normalizeDatabaseURL(getEnv("DATABASE_URL", "")),
-		MongoDatabase:         getEnv("MONGO_DATABASE", "travel_diary"),
-		AWSRegion:             getEnv("AWS_REGION", ""),
-		AWSAccessKeyID:        getEnv("AWS_ACCESS_KEY_ID", ""),
-		AWSSecretAccessKey:    getEnv("AWS_SECRET_ACCESS_KEY", ""),
-		AWSBucket:             getEnv("AWS_S3_BUCKET", ""),
-		JWTSecret:             getEnv("JWT_SECRET", "change-me"),
-		Auth0Domain:           getEnv("AUTH0_DOMAIN", ""),
-		Auth0Audience:         getEnv("AUTH0_AUDIENCE", ""),
-		Auth0Issuer:           getEnv("AUTH0_ISSUER", ""),
-		Auth0JWKSURL:          getEnv("AUTH0_JWKS_URL", ""),
-		CORSAllowedOrigins:    sanitizeOrigins(getEnv("CORS_ALLOWED_ORIGINS", "")),
-		GoogleClientID:        getEnv("GOOGLE_CLIENT_ID", ""),
-		GoogleClientSecret:    getEnv("GOOGLE_CLIENT_SECRET", ""),
-		GoogleAuthStateSecret: getEnv("GOOGLE_AUTH_STATE_SECRET", "state-secret"),
-		GoogleRedirectURL:     getEnv("GOOGLE_REDIRECT_URL", ""),
-		FrontendRedirectURL:   getEnv("FRONTEND_REDIRECT_URL", ""),
-		OpenAIKey:             getEnv("OPENAI_KEY", ""),
-		OpenAIModelImage:      getEnv("OPENAI_MODEL_IMAGE_ANALYSIS", "gpt-4o-mini"),
-		ImageAnalysisWorkers:  getEnvInt("IMAGE_ANALYSIS_WORKERS", 4),
+		AppName:                 getEnv("APP_NAME", "travel-diary-backend"),
+		Environment:             getEnv("APP_ENV", "development"),
+		Port:                    getEnv("PORT", "8001"),
+		DatabaseURL:             normalizeDatabaseURL(getEnv("DATABASE_URL", "")),
+		MongoDatabase:           getEnv("MONGO_DATABASE", "travel_diary"),
+		AWSRegion:               getEnv("AWS_REGION", ""),
+		AWSAccessKeyID:          getEnv("AWS_ACCESS_KEY_ID", ""),
+		AWSSecretAccessKey:      getEnv("AWS_SECRET_ACCESS_KEY", ""),
+		AWSBucket:               getEnv("AWS_S3_BUCKET", ""),
+		JWTSecret:               getEnv("JWT_SECRET", "change-me"),
+		Auth0Domain:             getEnv("AUTH0_DOMAIN", ""),
+		Auth0Audience:           getEnv("AUTH0_AUDIENCE", ""),
+		Auth0Issuer:             getEnv("AUTH0_ISSUER", ""),
+		Auth0JWKSURL:            getEnv("AUTH0_JWKS_URL", ""),
+		CORSAllowedOrigins:      sanitizeOrigins(getEnv("CORS_ALLOWED_ORIGINS", "")),
+		GoogleClientID:          getEnv("GOOGLE_CLIENT_ID", ""),
+		GoogleClientSecret:      getEnv("GOOGLE_CLIENT_SECRET", ""),
+		GoogleAuthStateSecret:   getEnv("GOOGLE_AUTH_STATE_SECRET", "state-secret"),
+		GoogleRedirectURL:       getEnv("GOOGLE_REDIRECT_URL", ""),
+		FrontendRedirectURL:     getEnv("FRONTEND_REDIRECT_URL", ""),
+		OpenAIKey:               getEnv("OPENAI_KEY", ""),
+		OpenAIModelImage:        getEnv("OPENAI_MODEL_IMAGE_ANALYSIS", "gpt-4o-mini"),
+		OpenAIModelCreative:     getEnv("OPENAI_MODEL_CREATIVE", getEnv("OPENAI_MODEL_IMAGE_ANALYSIS", "gpt-4o-mini")),
+		CreativePipelineEnabled: getEnvBool("CREATIVE_PIPELINE_ENABLED", false),
+		ImageAnalysisWorkers:    getEnvInt("IMAGE_ANALYSIS_WORKERS", 4),
+		GenerationWorkers:       getEnvInt("GENERATION_WORKERS", 1),
+		GenerationMaxAttempts:   getEnvInt("GENERATION_MAX_ATTEMPTS", 3),
 	}
 }
 
@@ -182,6 +190,17 @@ func getEnvInt(key string, fallback int) int {
 		return fallback
 	}
 	return parsed
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(key))) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
+	}
 }
 
 func ValidateDatabaseURL(raw string) error {

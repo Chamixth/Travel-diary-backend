@@ -97,6 +97,12 @@ func TripDeleteHandler(cfg config.Config, db *mongo.Database) fiber.Handler {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": err.Error()})
 		}
 		_ = dao.NewAlbumPlanDAO(db).DeleteByTripID(c.Context(), userID, c.Params("id"))
+		_ = dao.NewExperienceVersionDAO(db).DeleteByTripID(c.Context(), userID, c.Params("id"))
+		_ = dao.NewJourneyDAO(db).DeleteByTripID(c.Context(), userID, c.Params("id"))
+		_ = dao.NewStoryDAO(db).DeleteByTripID(c.Context(), userID, c.Params("id"))
+		_ = dao.NewCreativeDAO(db).DeleteByTripID(c.Context(), userID, c.Params("id"))
+		_ = dao.NewGenerationJobDAO(db).DeleteByTripID(c.Context(), userID, c.Params("id"))
+		_ = dao.NewUploadReservationDAO(db).DeleteByTripID(c.Context(), userID, c.Params("id"))
 		return c.SendStatus(fiber.StatusNoContent)
 	}
 }

@@ -2,9 +2,12 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 	"travel-diary-backend/internal/config"
 	"travel-diary-backend/internal/dao"
+	"travel-diary-backend/internal/generation"
 	"travel-diary-backend/internal/integrations"
 	"travel-diary-backend/internal/middleware"
 	"travel-diary-backend/internal/router"
@@ -42,6 +45,7 @@ func New(cfg config.Config) (*fiber.App, error) {
 		return nil, fmt.Errorf("create s3 client: %w", err)
 	}
 	analysisQueue := service.NewImageAnalysisQueue(cfg, db, s3Client)
+	generationQueue := generation.NewQueue(cfg, db)
 
 	corsCfg := fibercors.Config{
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
@@ -54,7 +58,15 @@ func New(cfg config.Config) (*fiber.App, error) {
 	app.Use(middleware.RequestLogger())
 	app.Use(middleware.Recover())
 
-	router.Register(app, cfg, db, analysisQueue)
+	router.Register(app, cfg, db, analysisQueue, generationQueue)
+	generationQueue.Start()
+	app.Hooks().OnShutdown(func() error {
+		shutdownContext, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		queueErr := generationQueue.Shutdown(shutdownContext)
+		databaseErr := client.Disconnect(shutdownContext)
+		return errors.Join(queueErr, databaseErr)
+	})
 
 	return app, nil
 }

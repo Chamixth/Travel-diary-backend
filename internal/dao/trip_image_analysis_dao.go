@@ -40,6 +40,7 @@ func (d TripImageAnalysisDAO) Upsert(ctx context.Context, a models.TripImageAnal
 			"quality":         a.Quality,
 			"composition":     a.Composition,
 			"locationGuess":   a.LocationGuess,
+			"memory":          a.Memory,
 			"model":           a.Model,
 			"analysisVersion": a.AnalysisVersion,
 			"promptVersion":   a.PromptVersion,

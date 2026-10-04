@@ -1,0 +1,47 @@
+{
+  "title": "VoyaLoom CreativeExploration v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generatorVersion", "concepts"],
+  "properties": {
+    "schemaVersion": { "type": "string", "enum": ["1.0"] },
+    "generatorVersion": { "type": "string", "enum": ["creative-explorer-v1"] },
+    "concepts": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/concept" }
+    }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1 },
+    "concept": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "title", "thesis", "interactionMetaphor", "emotionalInterpretation",
+        "visualWorld", "motionWorld", "typographyPersonality", "photographicTreatment",
+        "navigationConcept", "signatureInteraction", "climax", "endingConcept", "risks",
+        "technicalFeasibility", "whyItFits"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/text" },
+        "title": { "$ref": "#/$defs/text" },
+        "thesis": { "$ref": "#/$defs/text" },
+        "interactionMetaphor": { "$ref": "#/$defs/text" },
+        "emotionalInterpretation": { "$ref": "#/$defs/text" },
+        "visualWorld": { "$ref": "#/$defs/text" },
+        "motionWorld": { "$ref": "#/$defs/text" },
+        "typographyPersonality": { "$ref": "#/$defs/text" },
+        "photographicTreatment": { "$ref": "#/$defs/text" },
+        "navigationConcept": { "$ref": "#/$defs/text" },
+        "signatureInteraction": { "$ref": "#/$defs/text" },
+        "climax": { "$ref": "#/$defs/text" },
+        "endingConcept": { "$ref": "#/$defs/text" },
+        "risks": { "type": "array", "items": { "type": "string" } },
+        "technicalFeasibility": { "$ref": "#/$defs/text" },
+        "whyItFits": { "$ref": "#/$defs/text" }
+      }
+    }
+  }
+}

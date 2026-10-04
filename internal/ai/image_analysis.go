@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"travel-diary-backend/internal/ai/prompts"
 	"travel-diary-backend/internal/models"
 )
 
@@ -296,7 +297,7 @@ func (o *OpenAIImageAnalyzer) Analyze(ctx context.Context, imageURLValue, model 
 	if o.key == "" {
 		return models.TripImageAnalysis{}, fmt.Errorf("OPENAI_KEY is not configured")
 	}
-	reqBody := chatRequest{Model: model, Messages: []chatMessage{{Role: "user", Content: []contentPart{{Type: "text", Text: "Analyze this travel photograph. Return only JSON. Do not identify people. Normalize every score from 0 to 1. Assign exactly one uppercase suitePlace for the album layout. Use HEADER for strong group portraits or chapter-opening images, HERO for a visually dominant image, STORY for an image that supports narrative text, GRID for supporting images, QUOTE for emotionally expressive images, COVER for the strongest overall cover candidate, PROLOGUE for opening context, TRANSITION for connective moments, HIGHLIGHTS for standout moments, EPILOGUE for closing context, and CREDITS only when appropriate."}, {Type: "image_url", ImageURL: &imageURL{URL: imageURLValue, Detail: "low"}}}}}, ResponseFormat: responseFormat{Type: "json_schema", JSONSchema: schema{Name: "travel_image_analysis", Strict: true, Schema: imageSchema()}}}
+	reqBody := chatRequest{Model: model, Messages: []chatMessage{{Role: "user", Content: []contentPart{{Type: "text", Text: prompts.MemoryAnalystV1.Text}, {Type: "image_url", ImageURL: &imageURL{URL: imageURLValue, Detail: "low"}}}}}, ResponseFormat: responseFormat{Type: "json_schema", JSONSchema: schema{Name: "travel_image_analysis", Strict: true, Schema: imageSchema()}}}
 	data, _ := json.Marshal(reqBody)
 	var last error
 	for attempt := 0; attempt < 3; attempt++ {
@@ -316,6 +317,9 @@ func (o *OpenAIImageAnalyzer) Analyze(ctx context.Context, imageURLValue, model 
 				var a models.TripImageAnalysis
 				if err = json.Unmarshal([]byte(out.Choices[0].Message.Content), &a); err == nil {
 					a.SuitePlace = strings.ToUpper(strings.TrimSpace(a.SuitePlace))
+					if a.Memory.SchemaVersion == 0 {
+						a.Memory.SchemaVersion = models.MemoryAnalysisVersion
+					}
 					return a, nil
 				}
 			}
@@ -355,5 +359,21 @@ func imageSchema() map[string]any {
 		"quality":       map[string]any{"type": "object", "additionalProperties": false, "properties": map[string]any{"aestheticScore": map[string]any{"type": "number"}, "sharpnessScore": map[string]any{"type": "number"}, "exposureScore": map[string]any{"type": "number"}}, "required": []string{"aestheticScore", "sharpnessScore", "exposureScore"}},
 		"composition":   map[string]any{"type": "object", "additionalProperties": false, "properties": map[string]any{"subjectPosition": map[string]any{"type": "string"}, "negativeSpace": map[string]any{"type": "array", "items": map[string]any{"type": "string"}}, "textSafeAreas": map[string]any{"type": "array", "items": map[string]any{"type": "object", "additionalProperties": false, "properties": map[string]any{"position": map[string]any{"type": "string"}, "confidence": map[string]any{"type": "number"}}, "required": []string{"position", "confidence"}}}}, "required": []string{"subjectPosition", "negativeSpace", "textSafeAreas"}},
 		"locationGuess": map[string]any{"type": "object", "additionalProperties": false, "properties": map[string]any{"name": map[string]any{"type": "string"}, "confidence": map[string]any{"type": "number"}}, "required": []string{"name", "confidence"}},
-	}, "required": []string{"caption", "scene", "suitePlace", "visual", "content", "story", "quality", "composition", "locationGuess"}}
+		"memory":        memoryAnalysisSchema(),
+	}, "required": []string{"caption", "scene", "suitePlace", "visual", "content", "story", "quality", "composition", "locationGuess", "memory"}}
+}
+
+func memoryAnalysisSchema() map[string]any {
+	return map[string]any{"type": "object", "additionalProperties": false, "properties": map[string]any{
+		"schemaVersion":       map[string]any{"type": "integer", "const": models.MemoryAnalysisVersion},
+		"description":         map[string]any{"type": "string"},
+		"objects":             map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+		"readableText":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+		"dominantColors":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "maxItems": 6},
+		"visualImportance":    map[string]any{"type": "number", "minimum": 0, "maximum": 1},
+		"photographicQuality": map[string]any{"type": "number", "minimum": 0, "maximum": 1},
+		"storytellingValue":   map[string]any{"type": "number", "minimum": 0, "maximum": 1},
+		"candidateRoles":      map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+		"confidence":          map[string]any{"type": "number", "minimum": 0, "maximum": 1},
+	}, "required": []string{"schemaVersion", "description", "objects", "readableText", "dominantColors", "visualImportance", "photographicQuality", "storytellingValue", "candidateRoles", "confidence"}}
 }
